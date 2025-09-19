@@ -24,7 +24,7 @@
   },
   "keywords": [],
   "author": "New Horzion Tech",
-  "license": "ISC",
+  "license": "SEE LICENSE",
   "devDependencies": {
     "@types/node": "^24.5.2",
     "tsup": "^8.5.0",
