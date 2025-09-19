@@ -1,6 +1,6 @@
 {
   "name": "@peercolab/engine",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "",
   "main": "dist/index.cjs",
   "module": "dist/index.mjs",
@@ -17,6 +17,10 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/New-Horizon-Tech/peercolabengine-ts"
   },
   "keywords": [],
   "author": "New Horzion Tech",
