@@ -469,7 +469,7 @@ export class TransportRequest<T> {
         public readonly attributes: Attribute[],
         public readonly pathParams: Attribute[],
         public readonly requestJson: T,
-        public raw?: string
+        public raw?: string | null
     ) {
     }
 
@@ -543,7 +543,7 @@ export class CallInformation {
         return new CallInformation(
             locale,
             dataTenant ? dataTenant : "",
-            { performer: null, responsible: null, subject: null },
+            {},
             [],
             [],
             transactionId ? transactionId : generateUUID()
@@ -623,16 +623,16 @@ export class TransportContext {
                 mv.valueId = v.valueId
                 if (v.initialCharacters) {
                     const c = new  CharacterMetaValues()
-                    if (c.performer) c.withPerformer(new Identifier(v.initialCharacters?.performer?.id, v.initialCharacters?.performer?.type))
-                    if (c.responsible) c.withResponsible(new Identifier(v.initialCharacters?.responsible?.id, v.initialCharacters?.responsible?.type))
-                    if (c.subject) c.withSubject(new Identifier(v.initialCharacters?.subject?.id, v.initialCharacters?.subject?.type))
+                    if (v.initialCharacters?.performer) c.withPerformer(new Identifier(v.initialCharacters.performer.id, v.initialCharacters.performer.type))
+                    if (v.initialCharacters?.responsible) c.withResponsible(new Identifier(v.initialCharacters.responsible.id, v.initialCharacters.responsible.type))
+                    if (v.initialCharacters?.subject) c.withSubject(new Identifier(v.initialCharacters.subject.id, v.initialCharacters.subject.type))
                     mv.withInitialCharacters(c)
                 }
                 if (v.currentCharacters) {
                     const c = new  CharacterMetaValues()
-                    if (c.performer) c.withPerformer(new Identifier(v.currentCharacters?.performer?.id, v.currentCharacters?.performer?.type))
-                    if (c.responsible) c.withResponsible(new Identifier(v.currentCharacters?.responsible?.id, v.currentCharacters?.responsible?.type))
-                    if (c.subject) c.withSubject(new Identifier(v.currentCharacters?.subject?.id, v.currentCharacters?.subject?.type))
+                    if (v.currentCharacters?.performer) c.withPerformer(new Identifier(v.currentCharacters.performer.id, v.currentCharacters.performer.type))
+                    if (v.currentCharacters?.responsible) c.withResponsible(new Identifier(v.currentCharacters.responsible.id, v.currentCharacters.responsible.type))
+                    if (v.currentCharacters?.subject) c.withSubject(new Identifier(v.currentCharacters.subject.id, v.currentCharacters.subject.type))
                     mv.withCurrentCharacters(c)
                 } 
                 result.AddMetaValue(mv)
@@ -674,8 +674,8 @@ export class Result<T = undefined> {
     public value: T
     public statusCode: number
     public success: boolean
-    public meta?: Metavalues
-    public error?: TransportError
+    public meta?: Metavalues | undefined
+    public error?: TransportError | undefined
 
     public constructor(params: Result<T>) {
         this.value = params.value
@@ -685,7 +685,7 @@ export class Result<T = undefined> {
         this.error = params.error
             ? params.error
             : !this.isStatusCodeSuccess(this.statusCode)
-                ? new TransportError(this.statusCode.toString())
+                ? new TransportError(this.statusCode.toString(), 'Unknown error')
                 : undefined
     }
 
@@ -929,8 +929,8 @@ export class Metavalues {
 }
 
 export class Metavalue {
-  public valueId?: string
-  public dataTenant?: string
+  public valueId?: string | undefined
+  public dataTenant: string | undefined
   public initialCharacters?: CharacterMetaValues
   public currentCharacters?: CharacterMetaValues
 
@@ -954,17 +954,21 @@ export class Metavalue {
 
   public static with(
     valueId: string,
-    dataTenant?: string,
-    initialPerformer?: Identifier,
-    createdAt?: Date,
-    currentPerformer?: Identifier,
-    updatedAt?: Date
+    dataTenant: string | undefined,
+    initialPerformer?: Identifier | undefined,
+    createdAt?: Date | undefined,
+    currentPerformer?: Identifier | undefined,
+    updatedAt?: Date | undefined
   ) {
     const ret = new Metavalue()
-      .withInitialCharacters(CharacterMetaValues.fromPerformer(initialPerformer)
+    if (initialPerformer) {
+      ret.withInitialCharacters(CharacterMetaValues.fromPerformer(initialPerformer)
         .withTimestamp(createdAt))
-      .withCurrentCharacters(CharacterMetaValues.fromPerformer(currentPerformer)
+    }
+    if (currentPerformer) {
+      ret.withCurrentCharacters(CharacterMetaValues.fromPerformer(currentPerformer)
         .withTimestamp(updatedAt))
+    }
 
     ret.valueId = valueId
     ret.dataTenant = dataTenant
@@ -973,20 +977,20 @@ export class Metavalue {
 }
 
 export class Identifier {
-    type?: string;
-    id?: string;
+    type: string | undefined;
+    id: string;
 
-    constructor(type?: string,id?: string) {
+    constructor(id: string, type?: string | undefined) {
         this.type = type;
         this.id = id;
     }
 }
 
 export class CharacterMetaValues implements ICharacters {
-    subject?: Identifier | null | undefined
-    responsible?: Identifier | null | undefined
-    performer?: Identifier | null | undefined
-    public timestamp?: Date
+    subject?: Identifier | undefined
+    responsible?: Identifier | undefined
+    performer?: Identifier | undefined
+    public timestamp?: Date | undefined
 
     public hasSubject(): boolean {
         return this.subject != null
@@ -1004,34 +1008,34 @@ export class CharacterMetaValues implements ICharacters {
         return this.timestamp != null
     }
 
-    public static fromSubject(subjectOrTerm?: Identifier | string, id?: string): CharacterMetaValues {
-        return new CharacterMetaValues().withSubject(subjectOrTerm, id)
+    public static fromSubject(subjectOrTerm: Identifier): CharacterMetaValues {
+        return new CharacterMetaValues().withSubject(subjectOrTerm)
     }
 
-    public static fromResponsible(responsibleOrTerm?: Identifier | string, id?: string): CharacterMetaValues {
-        return new CharacterMetaValues().withResponsible(responsibleOrTerm, id)
+    public static fromResponsible(responsibleOrTerm: Identifier): CharacterMetaValues {
+        return new CharacterMetaValues().withResponsible(responsibleOrTerm)
     }
 
-    public static fromPerformer(performerOrTerm?: Identifier | string, id?: string): CharacterMetaValues {
-        return new CharacterMetaValues().withPerformer(performerOrTerm, id)
+    public static fromPerformer(performerOrTerm: Identifier): CharacterMetaValues {
+        return new CharacterMetaValues().withPerformer(performerOrTerm)
     }
 
     public static fromTimestamp(timestamp?: Date): CharacterMetaValues {
         return new CharacterMetaValues().withTimestamp(timestamp)
     }
 
-    public withSubject(subjectOrTerm?: Identifier | string, id?: string): CharacterMetaValues {
-        typeof(subjectOrTerm) == 'string' ? this.subject = new Identifier(subjectOrTerm, id) : this.subject = subjectOrTerm
+    public withSubject(subjectOrTerm: Identifier): CharacterMetaValues {
+        this.subject = subjectOrTerm
         return this
     }
 
-    public withResponsible(responsibleOrTerm?: Identifier | string, id?: string): CharacterMetaValues {
-        typeof(responsibleOrTerm) == 'string' ? this.responsible = new Identifier(responsibleOrTerm, id) : this.responsible = responsibleOrTerm
+    public withResponsible(responsibleOrTerm: Identifier): CharacterMetaValues {
+        this.responsible = responsibleOrTerm
         return this
     }
 
-    public withPerformer(performerOrTerm?: Identifier | string, id?: string): CharacterMetaValues {
-        typeof(performerOrTerm) == 'string' ? this.performer = new Identifier(performerOrTerm, id) : this.performer = performerOrTerm
+    public withPerformer(performerOrTerm: Identifier): CharacterMetaValues {
+        this.performer = performerOrTerm
         return this
     }
 
@@ -1042,19 +1046,19 @@ export class CharacterMetaValues implements ICharacters {
 }
 
 export interface ICharacters {
-    subject?: Identifier | null
-    responsible?: Identifier | null
-    performer?: Identifier | null
+    subject?: Identifier | undefined 
+    responsible?: Identifier | undefined
+    performer?: Identifier | undefined
 }
 
 export interface TransportErrorDetails {
-    technicalError?: string,
-    userError?: string,
-    sessionIdentifier?: string,
-    callingClient?: string,
-    callingUsage?: string,
-    calledOperation?: string,
-    transactionId?: string,
+    technicalError?: string | undefined,
+    userError?: string | undefined,
+    sessionIdentifier?: string | undefined,
+    callingClient?: string | undefined,
+    callingUsage?: string | undefined,
+    calledOperation?: string | undefined,
+    transactionId?: string | undefined,
 }
 
 export class TransportError {
@@ -1091,18 +1095,20 @@ export class TransportError {
     }
 
     public readonly code: string
-    public readonly details?: TransportErrorDetails
-    public readonly related?: TransportError[]
-    public readonly parent?: TransportError
+    public readonly details: TransportErrorDetails
+    public readonly related: TransportError[]
+    public readonly parent?: TransportError | undefined
 
     public constructor(
         code: string,
-        details?: TransportErrorDetails | string | null,
-        related?: TransportError[] | null,
-        parent?: TransportError
+        details: TransportErrorDetails | string,
+        related?: TransportError[] | undefined,
+        parent?: TransportError | undefined
     ) {
         this.code = code
-        this.details = typeof(details) == 'string' ? {technicalError: details} : details ?? undefined
+        this.details = typeof(details) == 'string' ? 
+            {technicalError: details} : 
+            details ?? { technicalError: 'Unknown error'}
         this.related = related ?? new Array<TransportError>()
         this.parent = parent
     }
