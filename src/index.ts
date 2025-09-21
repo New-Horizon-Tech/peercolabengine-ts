@@ -1507,13 +1507,13 @@ export class Logger {
 
 export type TransportOperationCharacter = {
     required: boolean
-    validTypes?: string[]
+    validTypes?: string[] | undefined
 }
 
 export type TransportOperationCharacterSetup = {
-    performer?: TransportOperationCharacter
-    responsible?: TransportOperationCharacter
-    subject?: TransportOperationCharacter
+    performer?: TransportOperationCharacter | undefined
+    responsible?: TransportOperationCharacter | undefined
+    subject?: TransportOperationCharacter | undefined
 }
 
 export type TransportOperationSettings = {
