@@ -853,6 +853,27 @@ export class Result<T = undefined> {
         }
     }
 
+    public maybePassThroughOk(onSuccess: (value: T) => Result<any>, throwErrors: boolean = false): Result<T> {
+        if (throwErrors) {
+            if (!this.success)
+                return this
+            const result = onSuccess(this.value)
+            if (!result.success)
+                return result.convert<T>()
+            return Result.ok(this.value)
+        }
+        try {
+            if (!this.success)
+                return this
+            const result = onSuccess(this.value)
+            if (!result.success)
+                return result.convert<T>()
+            return Result.ok(this.value)
+        } catch (e) {
+            return this.maybeError(e) as Result<T>
+        }
+    }
+
     public async maybeAsync<R>(onSuccess: (value: T) => Promise<Result<R>>, throwErrors: boolean = false): Promise<Result<R>> {
         if (throwErrors) {
             if (!this.success)
