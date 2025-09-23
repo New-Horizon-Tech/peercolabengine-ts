@@ -800,12 +800,7 @@ export class Result<T = undefined> {
         }
     }
 
-    public maybe<R>(onSuccess: (value: T) => Result<R>, throwErrors: boolean = false): Result<R> {
-        if (throwErrors) {
-            if (!this.success)
-                return this.convert<R>()
-            return onSuccess(this.value)
-        }   
+    public maybe<R>(onSuccess: (value: T) => Result<R>): Result<R> {
         try {
             if (!this.success)
                 return this.convert<R>()
@@ -815,13 +810,7 @@ export class Result<T = undefined> {
         }
     }
 
-    public maybeOk(onSuccess: (value: T) => void, throwErrors: boolean = false): Result<T> {
-        if (throwErrors) {
-            if (!this.success)
-                return this.convert()
-            onSuccess(this.value)
-            return Result.ok(this.value)
-        }   
+    public maybeOk(onSuccess: (value: T) => any): Result<T> {
         try {
             if (!this.success)
                 return this.convert()
@@ -832,15 +821,7 @@ export class Result<T = undefined> {
         }
     }
 
-    public maybePassThrough(onSuccess: (value: T) => Result<any>, throwErrors: boolean = false): Result<T> {
-        if (throwErrors) {
-            if (!this.success)
-                return this
-            const result = onSuccess(this.value)
-            if (!result.success)
-                return result.convert<T>()
-            return this
-        }
+    public maybePassThrough(onSuccess: (value: T) => Result<any>): Result<T> {
         try {
             if (!this.success)
                 return this
@@ -853,58 +834,12 @@ export class Result<T = undefined> {
         }
     }
 
-    public maybePassThroughOk(onSuccess: (value: T) => Result<any>, throwErrors: boolean = false): Result<T> {
-        if (throwErrors) {
+    public maybePassThroughOk(onSuccess: (value: T) => any): Result<T> {
+        try {
             if (!this.success)
                 return this
-            const result = onSuccess(this.value)
-            if (!result.success)
-                return result.convert<T>()
+            onSuccess(this.value)
             return Result.ok(this.value)
-        }
-        try {
-            if (!this.success)
-                return this
-            const result = onSuccess(this.value)
-            if (!result.success)
-                return result.convert<T>()
-            return Result.ok(this.value)
-        } catch (e) {
-            return this.maybeError(e) as Result<T>
-        }
-    }
-
-    public async maybeAsync<R>(onSuccess: (value: T) => Promise<Result<R>>, throwErrors: boolean = false): Promise<Result<R>> {
-        if (throwErrors) {
-            if (!this.success)
-                return this.convert<R>()
-            return await onSuccess(this.value)
-        }   
-        try {
-            if (!this.success)
-                return this.convert<R>()
-            return await onSuccess(this.value)
-        } catch (e) {
-            return this.maybeError(e) as Result<R>
-        }
-    }
-
-    public async maybePassThroughAsync(onSuccess: (value: T) => Promise<Result<any>>, throwErrors: boolean = false): Promise<Result<T>> {
-        if (throwErrors) {
-            if (!this.success)
-                return this
-            const result = await onSuccess(this.value)
-            if (!result.success)
-                return result.convert<T>()
-            return this
-        }
-        try {
-            if (!this.success)
-                return this
-            const result = await onSuccess(this.value)
-            if (!result.success)
-                return result.convert<T>()
-            return this
         } catch (e) {
             return this.maybeError(e) as Result<T>
         }
