@@ -856,6 +856,47 @@ export class Result<T = undefined> {
     }
 }
 
+export class ResultPassthroughAsync {
+  private actions: (() => Promise<Result<any>>)[] = []
+
+  public static startWith(action: () => Promise<Result<any>>): ResultPassthroughAsync {
+    return new ResultPassthroughAsync(action)
+  }
+
+  constructor(action: () => Promise<Result<any>>) {
+    this.actions.push(action)
+  }
+
+  public then(action: () => Promise<Result<any>>): ResultPassthroughAsync {
+    this.actions.push(action)
+    return this
+  }
+
+  public async run(): Promise<Result<any>> {
+    for (const action of this.actions) {
+      try {
+        const result = await action()
+        if (!result.success)
+          return result
+      } catch (e) {
+        return this.maybeError(e)
+      } 
+    }
+    return Result.ok()
+  }
+
+  private maybeError(e: unknown): Result<any> {
+    if (e) {
+      const err = (e as Error)
+      Logger.error('MaybeException: ', err)
+      return Result.failed(500, "TransportAbstraction.MaybeException", err.message + ": " + err.name + (err.stack ? "\n" + err.stack : ""))
+    }
+    Logger.error('MaybeException: Unknown error')
+    return Result.failed(500, "TransportAbstraction.MaybeException", "Unknown error")
+  }
+}
+ 
+
 export class Metavalues {
   public hasMoreValues: boolean
   public values: Metavalue[]
