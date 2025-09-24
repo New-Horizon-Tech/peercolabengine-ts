@@ -856,23 +856,34 @@ export class Result<T = undefined> {
     }
 }
 
-export class ResultPassthroughAsync {
+export class ResultPassthroughAsync<T> {
+  private initialAction: (() => Promise<Result<T>>)
   private actions: (() => Promise<Result<any>>)[] = []
 
-  public static startWith(action: () => Promise<Result<any>>): ResultPassthroughAsync {
+  public static startWith<R>(action: () => Promise<Result<R>>): ResultPassthroughAsync<R> {
     return new ResultPassthroughAsync(action)
   }
 
-  constructor(action: () => Promise<Result<any>>) {
-    this.actions.push(action)
+  constructor(action: () => Promise<Result<T>>) {
+    this.initialAction = action
   }
 
-  public then(action: () => Promise<Result<any>>): ResultPassthroughAsync {
+  public then(action: () => Promise<Result<any>>): ResultPassthroughAsync<T> {
     this.actions.push(action)
     return this
   }
 
-  public async run(): Promise<Result<any>> {
+  public async run(): Promise<Result<T>> {
+    let initialResult: Result<T> = Result.failed(500, "TransportAbstraction.MaybeException", "Unknown error")
+    try {
+      initialResult = await this.initialAction() 
+    } catch (e) {
+      return this.maybeError(e)
+    }
+
+    if (!initialResult.success)
+      return initialResult
+
     for (const action of this.actions) {
       try {
         const result = await action()
@@ -882,7 +893,8 @@ export class ResultPassthroughAsync {
         return this.maybeError(e)
       } 
     }
-    return Result.ok()
+
+    return initialResult
   }
 
   private maybeError(e: unknown): Result<any> {
