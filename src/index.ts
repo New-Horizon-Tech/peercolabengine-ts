@@ -723,6 +723,7 @@ export class Result<T = undefined> {
         return new Result<V>({
             success: true,
             value: value,
+            meta: new Metavalues(),
             statusCode: code ?? 200
         } as Result<V>)
     }
@@ -731,6 +732,7 @@ export class Result<T = undefined> {
         return new Result({
             success: true,
             value: undefined,
+            meta: new Metavalues(),
             statusCode: code
         } as Result)
     }
@@ -751,6 +753,7 @@ export class Result<T = undefined> {
         return new Result({
             value: undefined,
             statusCode: statusCode,
+            meta: new Metavalues(),
             success: false,
             error: (typeof(errorData) == 'string' ? 
                 new TransportError(
@@ -772,12 +775,18 @@ export class Result<T = undefined> {
     }
 
     public AddMetaValue(value: Metavalue): Result<T> {
-        this.meta?.add(value)
+        if (!this.meta) {
+            this.meta = new Metavalues()
+        }
+        this.meta.add(value)
         return this
     }
 
     public AddMetaValues(values: Metavalue[]): Result<T> {
-        this.meta?.add(values)
+        if (!this.meta) {
+            this.meta = new Metavalues()
+        }
+        this.meta.add(values)
         return this
     }
 
