@@ -822,7 +822,7 @@ export class Result<T = undefined> {
             if (!this.success)
                 return this.convert()
             onSuccess(this.value, this.meta ? this.meta : new Metavalues())
-            return Result.ok(this.value)
+            return Result.ok(this.value).withMeta(this.meta ? this.meta : new Metavalues())
         } catch (e) {
             return this.maybeError(e) as Result<T>
         }
@@ -846,7 +846,7 @@ export class Result<T = undefined> {
             if (!this.success)
                 return this
             onSuccess(this.value, this.meta ? this.meta : new Metavalues())
-            return Result.ok(this.value)
+            return Result.ok(this.value).withMeta(this.meta ? this.meta : new Metavalues())
         } catch (e) {
             return this.maybeError(e) as Result<T>
         }
