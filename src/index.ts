@@ -807,32 +807,32 @@ export class Result<T = undefined> {
         }
     }
 
-    public maybe<R>(onSuccess: (value: T) => Result<R>): Result<R> {
+    public maybe<R>(onSuccess: (value: T, meta: Metavalues) => Result<R>): Result<R> {
         try {
             if (!this.success)
                 return this.convert<R>()
-            return onSuccess(this.value)
+            return onSuccess(this.value, this.meta ? this.meta : new Metavalues())
         } catch (e) {
             return this.maybeError(e) as Result<R>
         }
     }
 
-    public maybeOk(onSuccess: (value: T) => any): Result<T> {
+    public maybeOk(onSuccess: (value: T, meta: Metavalues) => any): Result<T> {
         try {
             if (!this.success)
                 return this.convert()
-            onSuccess(this.value)
+            onSuccess(this.value, this.meta ? this.meta : new Metavalues())
             return Result.ok(this.value)
         } catch (e) {
             return this.maybeError(e) as Result<T>
         }
     }
 
-    public maybePassThrough(onSuccess: (value: T) => Result<any>): Result<T> {
+    public maybePassThrough(onSuccess: (value: T, meta: Metavalues) => Result<any>): Result<T> {
         try {
             if (!this.success)
                 return this
-            const result = onSuccess(this.value)
+            const result = onSuccess(this.value, this.meta ? this.meta : new Metavalues())
             if (!result.success)
                 return result.convert<T>()
             return this
@@ -841,11 +841,11 @@ export class Result<T = undefined> {
         }
     }
 
-    public maybePassThroughOk(onSuccess: (value: T) => any): Result<T> {
+    public maybePassThroughOk(onSuccess: (value: T, meta: Metavalues) => any): Result<T> {
         try {
             if (!this.success)
                 return this
-            onSuccess(this.value)
+            onSuccess(this.value, this.meta ? this.meta : new Metavalues())
             return Result.ok(this.value)
         } catch (e) {
             return this.maybeError(e) as Result<T>
