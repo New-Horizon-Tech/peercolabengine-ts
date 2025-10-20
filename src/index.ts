@@ -573,11 +573,9 @@ export class TransportContext {
         return !!this.call.attributes.find(item => item.name === name)
     }
 
-    public getAttribute<T>(name: string): T | undefined {
+    public getAttribute<T>(name: string): T {
         const item = this.call.attributes.find(item => item.name === name)
-        return item?.value ?
-            item?.value as T :
-            undefined
+        return item?.value as T
     }
 
     public hasPathParameter(name: string): boolean {
@@ -768,17 +766,17 @@ export class Result<T = undefined> {
         } as Result<T>)
     }
 
-    public withMeta(meta: Metavalues): Result<T | undefined> {
+    public withMeta(meta: Metavalues): Result<T> {
         this.meta = meta
         return this
     }
 
-    public AddMetaValue(value: Metavalue): Result<T | undefined> {
+    public AddMetaValue(value: Metavalue): Result<T> {
         this.meta?.add(value)
         return this
     }
 
-    public AddMetaValues(values: Metavalue[]): Result<T | undefined> {
+    public AddMetaValues(values: Metavalue[]): Result<T> {
         this.meta?.add(values)
         return this
     }
