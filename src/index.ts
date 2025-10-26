@@ -949,6 +949,7 @@ export class Metavalue {
   public dataTenant: string | undefined
   public initialCharacters?: CharacterMetaValues
   public currentCharacters?: CharacterMetaValues
+  public attributes: Attribute[] = []
 
   public knowsInitialCharacters() : boolean {
     return this.initialCharacters === undefined
@@ -966,6 +967,20 @@ export class Metavalue {
   public withCurrentCharacters(characters: CharacterMetaValues): Metavalue {
     this.currentCharacters = characters
     return this
+  }
+
+  public withAttribute(name: string, value: object): Metavalue {
+    this.attributes.push(new Attribute(name, value))
+    return this
+  }
+
+  public hasAttribute(name: string): boolean {
+    return this.attributes.some(a => a.name === name)
+  }
+
+  public getAttribute<T>(name: string): T | undefined {
+    const item = this.attributes.find(item => item.name === name)
+    return item?.value as T
   }
 
   public static with(
