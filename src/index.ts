@@ -970,7 +970,11 @@ export class Metavalue {
   }
 
   public withAttribute(name: string, value: object): Metavalue {
-    this.attributes.push(new Attribute(name, value))
+    const attr = this.attributes.find(a => a.name === name)
+    if (attr)
+        attr.value = value as object
+    else
+        this.attributes.push(new Attribute(name, value))
     return this
   }
 
@@ -978,7 +982,7 @@ export class Metavalue {
     return this.attributes.some(a => a.name === name)
   }
 
-  public getAttribute<T>(name: string): T | undefined {
+  public getAttribute<T>(name: string): T {
     const item = this.attributes.find(item => item.name === name)
     return item?.value as T
   }
