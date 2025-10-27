@@ -611,7 +611,17 @@ export class TransportContext {
     }
 
     public deserializeResult<T>(data: string): Result<T> {
-        const plain = this.serializer.deserialize<Result<T>>(data)
+        return Result.deserializeResult<T>(this.serializer, data)
+    }
+
+    public serializeRequest<T>(input: T): string {
+        return TransportRequest.from(input, this).serialize()
+    }
+}
+
+export class Result<T = undefined> {
+    public static deserializeResult<T>(serializer: TransportSerializer, data: string): Result<T> {
+        const plain = serializer.deserialize<Result<T>>(data)
         const result = new Result<T>(plain)
         if (plain.meta) {
             result.meta = new Metavalues()
@@ -633,6 +643,9 @@ export class TransportContext {
                     if (v.currentCharacters?.subject) c.withSubject(new Identifier(v.currentCharacters.subject.id, v.currentCharacters.subject.type))
                     mv.withCurrentCharacters(c)
                 } 
+                v.attributes.forEach(attr => {
+                    mv.withAttribute(attr.name, attr.value)
+                })
                 result.AddMetaValue(mv)
             })
         }
@@ -657,12 +670,6 @@ export class TransportContext {
         return result
     }
 
-    public serializeRequest<T>(input: T): string {
-        return TransportRequest.from(input, this).serialize()
-    }
-}
-
-export class Result<T = undefined> {
     private serializer?: TransportSerializer
 
     public asGeneric(): Result<object> {
@@ -672,7 +679,7 @@ export class Result<T = undefined> {
     public value: T
     public statusCode: number
     public success: boolean
-    public meta?: Metavalues | undefined
+    public meta: Metavalues
     public error?: TransportError | undefined
 
     public constructor(params: Result<T>) {
@@ -713,10 +720,7 @@ export class Result<T = undefined> {
     public deserialize<T>(serialized: string) : Result<T> {
         if (!this.serializer)
             throw new Error('No serializer assigned to Result')
-        const deserialized = this.serializer.deserialize<Result<T>>(serialized)
-        const newFromDeserialized = new Result<T>(deserialized)
-        newFromDeserialized.assignSerializer(this.serializer)
-        return newFromDeserialized
+        return Result.deserializeResult<T>(this.serializer, serialized)
     }
 
     public static ok<V = undefined>(value?: V , code?: number): Result<V> {
@@ -798,7 +802,7 @@ export class Result<T = undefined> {
         } else if (this.serializer) {
             try {
                 const serializer = this.serializer
-                return serializer.deserialize<Result<R>>(serializer.serialize(this))
+                return serializer.deserialize<Result<R>>(serializer.serialize(this)).withMeta(this.meta ?? new Metavalues())
             } catch (error) {
                 return Result.internalServerError("TransportAbstraction.Serialization.DeserializeError", 'Could not deserialize response') as Result<R>
             }
