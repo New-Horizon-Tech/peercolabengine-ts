@@ -794,6 +794,12 @@ export class Result<T = undefined> {
         return this
     }
 
+    public convertToEmpty(): Result<undefined> {
+        if (this.error)
+            return Result.failed<undefined>(this.statusCode, this.error).withMeta(this.meta)
+        return Result.ok().withMeta(this.meta)
+    }
+
     public convert<R>(resultType?: any): Result<R> {
         if (this instanceof(Result) && this.value == null) {
             return this as unknown as Result<R>
