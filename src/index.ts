@@ -35,12 +35,18 @@
  */
 export type OperationVerb = 'GET' | 'SEARCH' | 'CREATE' | 'ADD' | 'UPDATE' | 'PATCH' | 'REMOVE' | 'DELETE' | 'START' | 'STOP' | 'PROCESS' | 'SEARCH' | 'NAVIGATETO'
 
+export type OutOfContextOperationPathParameter = {
+    name: string;
+    value: string;
+}
+
 export type OutOfContextOperation = {
     usageId: string;
     operationId: string;
     operationVerb: string;
     operationType: string;
     requestJson: any;
+    pathParameters?: OutOfContextOperationPathParameter[];
 };
 
 export interface ContextCache {
@@ -382,12 +388,25 @@ export class TransportClient {
             )
         const requestCallInfo = Object.assign({}, this.callInfo)
         if (!requestCallInfo.transactionId)
-            requestCallInfo.transactionId = generateUUID()
+            requestCallInfo.transactionId = generateUUID() 
         const ctx = new TransportContext(
             call.asOperationInformation(this.clientIdentifier),
             requestCallInfo,
             this.config.serializer
         )
+
+        const operationPathParameters = operation.pathParameters?.map(param => {
+            const attr: Attribute = {
+                name: param.name,
+                value: param.value as unknown as object
+            }
+            return attr
+        }) ?? []
+        operationPathParameters.forEach((param) => {
+            if (ctx.hasPathParameter(param.name))
+                return
+            ctx.call.pathParams.push(param)
+        })
         
         // Append missing attributes
         customAttributes.forEach((attribute) => {
