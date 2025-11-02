@@ -80,12 +80,12 @@ export class InMemoryContextCache implements ContextCache {
 }
 
 export class Transport {
-    public static session(identifier: string) : TransportAbstractionBuilder {
-        return new TransportAbstractionBuilder(identifier)
+    public static session(identifier: string) : TransportSessionBuilder {
+        return new TransportSessionBuilder(identifier)
     }
 }
 
-export class TransportAbstractionBuilder {
+export class TransportSessionBuilder {
     private config: TransportSessionConfiguration
 
     public constructor(identifier: string) {
@@ -107,17 +107,17 @@ export class TransportAbstractionBuilder {
         }
     }
 
-    public setupOutboundContextCache(cache: ContextCache): TransportAbstractionBuilder {
+    public setupOutboundContextCache(cache: ContextCache): TransportSessionBuilder {
         this.config.interceptors.contextCache = cache
         return this;
     }
 
-    public assignSerializer(serializer: TransportSerializer): TransportAbstractionBuilder {
+    public assignSerializer(serializer: TransportSerializer): TransportSessionBuilder {
         this.config.serializer = serializer
         return this
     }
 
-    public intercept<T,R>(handler: OperationHandler<T,R>): TransportAbstractionBuilder {
+    public intercept<T,R>(handler: OperationHandler<T,R>): TransportSessionBuilder {
         if (handler instanceof RequestOperationHandler)
             this.config.interceptors.addRequestHandler(handler.operation.id, handler.handler)
         else if (handler instanceof MessageOperationHandler)
@@ -125,17 +125,17 @@ export class TransportAbstractionBuilder {
         return this
     }
 
-    public interceptPattern(pattern: string, handler: RequestInterceptor<object,object>): TransportAbstractionBuilder {
+    public interceptPattern(pattern: string, handler: RequestInterceptor<object,object>): TransportSessionBuilder {
         this.config.interceptors.addPatternHandler(pattern, handler)
         return this
     }
 
-    public inspectRequest(inspector: RequestInspector): TransportAbstractionBuilder {
+    public inspectRequest(inspector: RequestInspector): TransportSessionBuilder {
         this.config.interceptors.requestsInspector = inspector
         return this
     }
 
-    public inspectResponse(inspector: ResponseInspector): TransportAbstractionBuilder {
+    public inspectResponse(inspector: ResponseInspector): TransportSessionBuilder {
         this.config.interceptors.responsesInspector = inspector
         return this
     }
@@ -148,11 +148,13 @@ export class TransportAbstractionBuilder {
         return new TransportSession(this.config)
     }
 
-    public onLogMessage(logger: TransportAbstractionLogger): TransportAbstractionBuilder {
+    public onLogMessage(logger: TransportSessionLogger): TransportSessionBuilder {
         Logger.assignLogger(logger)
         return this
     }
 }
+
+export type TransportAbstractionBuilder = TransportSessionBuilder;
 
 export class OutboundSessionBuilder {
     private serviceId: string
@@ -829,10 +831,10 @@ export class Result<T = undefined> {
                 const serializer = this.serializer
                 return serializer.deserialize<Result<R>>(serializer.serialize(this)).withMeta(this.meta ?? new Metavalues())
             } catch (error) {
-                return Result.internalServerError("TransportAbstraction.Serialization.DeserializeError", 'Could not deserialize response') as Result<R>
+                return Result.internalServerError("TransportSession.Serialization.DeserializeError", 'Could not deserialize response') as Result<R>
             }
         } else {
-            return Result.internalServerError("TransportAbstraction.Serialization.DeserializeError", 'Could not convert Result') as Result<R>
+            return Result.internalServerError("TransportSession.Serialization.DeserializeError", 'Could not convert Result') as Result<R>
         }
     }
 
@@ -885,10 +887,10 @@ export class Result<T = undefined> {
         if (e) {
             const err = (e as Error)
             Logger.error('MaybeException: ', err)
-            return Result.failed(500, "TransportAbstraction.MaybeException", err.message + ": " + err.name + (err.stack ? "\n" + err.stack : ""))
+            return Result.failed(500, "TransportSession.MaybeException", err.message + ": " + err.name + (err.stack ? "\n" + err.stack : ""))
         }
         Logger.error('MaybeException: Unknown error')
-        return Result.failed(500, "TransportAbstraction.MaybeException", "Unknown error")
+        return Result.failed(500, "TransportSession.MaybeException", "Unknown error")
     }
 }
 
@@ -910,7 +912,7 @@ export class ResultPassthroughAsync<T> {
   }
 
   public async run(): Promise<Result<T>> {
-    let initialResult: Result<T> = Result.failed(500, "TransportAbstraction.MaybeException", "Unknown error")
+    let initialResult: Result<T> = Result.failed(500, "TransportSession.MaybeException", "Unknown error")
     try {
       initialResult = await this.initialAction() 
     } catch (e) {
@@ -937,10 +939,10 @@ export class ResultPassthroughAsync<T> {
     if (e) {
       const err = (e as Error)
       Logger.error('MaybeException: ', err)
-      return Result.failed(500, "TransportAbstraction.MaybeException", err.message + ": " + err.name + (err.stack ? "\n" + err.stack : ""))
+      return Result.failed(500, "TransportSession.MaybeException", err.message + ": " + err.name + (err.stack ? "\n" + err.stack : ""))
     }
     Logger.error('MaybeException: Unknown error')
-    return Result.failed(500, "TransportAbstraction.MaybeException", "Unknown error")
+    return Result.failed(500, "TransportSession.MaybeException", "Unknown error")
   }
 }
  
@@ -1338,7 +1340,7 @@ export class TransportDispatcher {
         try {
             const result = await this.contextCache.put(ctx.call.transactionId as string, ctx.call)
             if (!result)
-                return Result.failed(500, "TransportAbstraction.ContextCachePersistance", "The incoming context could not be presisted for transaction " + ctx.call.transactionId)
+                return Result.failed(500, "TransportSession.ContextCachePersistance", "The incoming context could not be presisted for transaction " + ctx.call.transactionId)
             return Result.ok(ctx)
         } catch (e) {
             Logger.error((e as Error).message)
@@ -1461,15 +1463,15 @@ export class TransportDispatcher {
     }
 
     private handlerNotFound(operationId: string): Result<object> {
-        return Result.badRequest("TransportAbstraction.HandlerNotFound", "There are no matching handlers for the operation: " + operationId)
+        return Result.badRequest("TransportSession.HandlerNotFound", "There are no matching handlers for the operation: " + operationId)
     }
 
     private genericError(e: unknown): Result<object> {
         if (e) {
             const err = (e as Error)
-            return Result.failed(500, "TransportAbstraction.UnhandledError", err.message + ": " + err.name + (err.stack ? "\n" + err.stack : ""))
+            return Result.failed(500, "TransportSession.UnhandledError", err.message + ": " + err.name + (err.stack ? "\n" + err.stack : ""))
         }
-        return Result.failed(500, "TransportAbstraction.UnhandledError", "Unknown error")
+        return Result.failed(500, "TransportSession.UnhandledError", "Unknown error")
     }
 }
 
@@ -1512,12 +1514,12 @@ export class LogMessage {
     }
 }
 
-export interface TransportAbstractionLogger {
+export interface TransportSessionLogger {
     logLevel: LogLevel
     write: (message: LogMessage) => void;
 }
 
-export class DefaultLogger implements TransportAbstractionLogger {
+export class DefaultLogger implements TransportSessionLogger {
     public logLevel = LogLevel.DEBUG
 
     public write(message: LogMessage): void {
@@ -1529,9 +1531,9 @@ export class DefaultLogger implements TransportAbstractionLogger {
 
 export class Logger {
     private static source = ''
-    private static logger: TransportAbstractionLogger = new DefaultLogger()
+    private static logger: TransportSessionLogger = new DefaultLogger()
 
-    public static assignLogger(logger: TransportAbstractionLogger): void {
+    public static assignLogger(logger: TransportSessionLogger): void {
         this.logger = logger
     }
 
