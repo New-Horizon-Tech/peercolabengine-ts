@@ -646,6 +646,7 @@ export class Result<T = undefined> {
         const result = new Result<T>(plain)
         if (plain.meta) {
             result.meta = new Metavalues()
+            result.meta.setHasMoreValues(plain.meta.hasMoreValues)
             plain.meta.values.forEach(v => {
                 const mv = new Metavalue()
                 mv.dataTenant = v.dataTenant
@@ -972,8 +973,8 @@ export class Metavalues {
     return this.values.find(i => i.valueId === valueId)
   }
 
-  public setHasMoreValues(): Metavalues {
-    this.hasMoreValues = true
+  public setHasMoreValues(moreValues?: boolean): Metavalues {
+    this.hasMoreValues = moreValues ?? true
     return this
   }
 
