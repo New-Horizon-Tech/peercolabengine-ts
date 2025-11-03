@@ -744,20 +744,20 @@ export class Result<T = undefined> {
         return Result.deserializeResult<T>(this.serializer, serialized)
     }
 
-    public static ok<V = undefined>(value?: V , code?: number): Result<V> {
+    public static ok<V = undefined>(value?: V, meta?: Metavalues): Result<V> {
         return new Result<V>({
             success: true,
             value: value,
-            meta: new Metavalues(),
-            statusCode: code ?? 200
+            meta: meta ?? new Metavalues(),
+            statusCode: 200
         } as Result<V>)
     }
 
-    public static okStatus(code: number): Result<undefined> {
+    public static okStatus(code: number, meta?: Metavalues): Result<undefined> {
         return new Result({
             success: true,
             value: undefined,
-            meta: new Metavalues(),
+            meta: meta ?? new Metavalues(),
             statusCode: code
         } as Result)
     }
@@ -794,8 +794,16 @@ export class Result<T = undefined> {
         } as Result<T>)
     }
 
-    public withMeta(meta: Metavalues): Result<T> {
+    public setMeta(meta: Metavalues): Result<T> {
         this.meta = meta
+        return this
+    }
+
+    public withMeta(handler: (meta: Metavalues) => Result<T>): Result<T> {
+        if (!this.meta) {
+            this.meta = new Metavalues()
+        }
+        handler(this.meta)
         return this
     }
 
@@ -817,8 +825,8 @@ export class Result<T = undefined> {
 
     public convertToEmpty(): Result<undefined> {
         if (this.error)
-            return Result.failed<undefined>(this.statusCode, this.error).withMeta(this.meta)
-        return Result.ok().withMeta(this.meta)
+            return Result.failed<undefined>(this.statusCode, this.error).setMeta(this.meta)
+        return Result.ok().setMeta(this.meta)
     }
 
     public convert<R>(resultType?: any): Result<R> {
@@ -829,7 +837,7 @@ export class Result<T = undefined> {
         } else if (this.serializer) {
             try {
                 const serializer = this.serializer
-                return serializer.deserialize<Result<R>>(serializer.serialize(this)).withMeta(this.meta ?? new Metavalues())
+                return serializer.deserialize<Result<R>>(serializer.serialize(this)).setMeta(this.meta ?? new Metavalues())
             } catch (error) {
                 return Result.internalServerError("TransportSession.Serialization.DeserializeError", 'Could not deserialize response') as Result<R>
             }
@@ -853,7 +861,7 @@ export class Result<T = undefined> {
             if (!this.success)
                 return this.convert()
             onSuccess(this.value, this.meta ? this.meta : new Metavalues())
-            return Result.ok(this.value).withMeta(this.meta ? this.meta : new Metavalues())
+            return Result.ok(this.value).setMeta(this.meta ? this.meta : new Metavalues())
         } catch (e) {
             return this.maybeError(e) as Result<T>
         }
@@ -877,7 +885,7 @@ export class Result<T = undefined> {
             if (!this.success)
                 return this
             onSuccess(this.value, this.meta ? this.meta : new Metavalues())
-            return Result.ok(this.value).withMeta(this.meta ? this.meta : new Metavalues())
+            return Result.ok(this.value).setMeta(this.meta ? this.meta : new Metavalues())
         } catch (e) {
             return this.maybeError(e) as Result<T>
         }
