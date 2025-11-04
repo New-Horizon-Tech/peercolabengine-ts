@@ -665,9 +665,11 @@ export class Result<T = undefined> {
                     if (v.currentCharacters?.subject) c.withSubject(new Identifier(v.currentCharacters.subject.id, v.currentCharacters.subject.type))
                     mv.withCurrentCharacters(c)
                 } 
-                v.attributes.forEach(attr => {
-                    mv.withAttribute(attr.name, attr.value)
-                })
+                if (v.attributes) {
+                    v.attributes.forEach(attr => {
+                        mv.withAttribute(attr.name, attr.value)
+                    })
+                }
                 result.AddMetaValue(mv)
             })
         }
