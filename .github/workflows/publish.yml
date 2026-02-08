@@ -32,6 +32,11 @@ jobs:
       - name: Test
         run: npm test --if-present
 
+      - name: Clear npm token env
+        run: |
+          unset NODE_AUTH_TOKEN
+          unset NPM_TOKEN
+
       - name: Publish
         run: |
           # Optional: Publish through trusted publishing
