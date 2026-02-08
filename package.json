@@ -1,6 +1,6 @@
 {
   "name": "@peercolab/engine",
-  "version": "0.1.25",
+  "version": "0.1.27",
   "description": "",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
