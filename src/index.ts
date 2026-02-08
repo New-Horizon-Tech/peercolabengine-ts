@@ -811,7 +811,7 @@ export class Result<T = undefined> {
     }
 
     public withMeta(handler: (meta: Metavalues) => void): Result<T> {
-        if (!this.meta) {
+        if (!(this.meta instanceof Metavalues)) {
             this.meta = new Metavalues()
         }
         handler(this.meta)
@@ -819,7 +819,7 @@ export class Result<T = undefined> {
     }
 
     public AddMetaValue(value: Metavalue): Result<T> {
-        if (!this.meta) {
+        if (!(this.meta instanceof Metavalues)) {
             this.meta = new Metavalues()
         }
         this.meta.add(value)
@@ -827,7 +827,7 @@ export class Result<T = undefined> {
     }
 
     public AddMetaValues(values: Metavalue[]): Result<T> {
-        if (!this.meta) {
+        if (!(this.meta instanceof Metavalues)) {
             this.meta = new Metavalues()
         }
         this.meta.add(values)
