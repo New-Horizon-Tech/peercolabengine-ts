@@ -34,5 +34,5 @@ jobs:
       - name: Publish
         run: |
           # Optional: Publish through trusted publishing
-          node -e "const v=require('./package.json').version; const t=process.env.GITHUB_REF_NAME.replace(/^v/,''); if(v!==t){ console.error(`package.json version ${v} != tag ${t}`); process.exit(1);} "
+          node -e 'const v=require("./package.json").version; const t=(process.env.GITHUB_REF_NAME||"").replace(/^v/,""); if(v!==t){ console.error("package.json version "+v+" != tag "+t); process.exit(1);} '
           npm publish --access public
