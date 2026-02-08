@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write   # enables npm provenance (optional but nice)
+      id-token: write   # required for OIDC
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,8 +32,7 @@ jobs:
         run: npm test --if-present
 
       - name: Publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          # Optional: add provenance (requires id-token: write and npm >=9.5)
-          npm publish --provenance --access public
+          # Optional: Publish through trusted publishing
+          node -e "const v=require('./package.json').version; const t=process.env.GITHUB_REF_NAME.replace(/^v/,''); if(v!==t){ console.error(`package.json version ${v} != tag ${t}`); process.exit(1);} "
+          npm publish --access public
