@@ -12,14 +12,13 @@ jobs:
     permissions:
       contents: read
       id-token: write   # required for OIDC
-    env:
-      NPM_CONFIG_USERCONFIG: ${{ runner.temp }}/npmrc
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Sanitize npm auth
         run: |
+          echo "NPM_CONFIG_USERCONFIG=$RUNNER_TEMP/npmrc" >> "$GITHUB_ENV"
           unset NODE_AUTH_TOKEN
           unset NPM_TOKEN
           rm -f ~/.npmrc
