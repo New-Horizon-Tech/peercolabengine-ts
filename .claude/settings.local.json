@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:remarkablemark.org)",
+      "WebFetch(domain:docs.npmjs.com)"
+    ]
+  }
+}
