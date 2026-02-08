@@ -810,7 +810,7 @@ export class Result<T = undefined> {
         return this
     }
 
-    public withMeta(handler: (meta: Metavalues) => Result<T>): Result<T> {
+    public withMeta(handler: (meta: Metavalues) => void): Result<T> {
         if (!this.meta) {
             this.meta = new Metavalues()
         }
