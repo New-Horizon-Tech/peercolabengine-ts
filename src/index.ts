@@ -646,7 +646,15 @@ export class Result<T = undefined> {
         const result = new Result<T>(plain)
         if (plain.meta) {
             result.meta = new Metavalues()
-            result.meta.setHasMoreValues(plain.meta.hasMoreValues)
+            if (plain.meta.hasMoreValues !== undefined)
+                result.meta.setHasMoreValues(plain.meta.hasMoreValues)
+            if (plain.meta.totalValueCount !== undefined)
+                result.meta.setTotalValueCount(plain.meta.totalValueCount)
+            if (plain.meta.attributes) {
+                plain.meta.attributes.forEach(attr => {
+                    result.meta.withAttribute(attr.name, attr.value)
+                })
+            }
             plain.meta.values.forEach(v => {
                 const mv = new Metavalue()
                 mv.dataTenant = v.dataTenant
@@ -961,10 +969,13 @@ export class ResultPassthroughAsync<T> {
 export class Metavalues {
   public hasMoreValues: boolean
   public values: Metavalue[]
+  public totalValueCount: number | undefined
+  public attributes: Attribute[]
 
   constructor() {
     this.hasMoreValues = false
     this.values = []
+    this.attributes = []
   }
 
   public hasMetaValue(valueId: string): boolean {
@@ -976,13 +987,37 @@ export class Metavalues {
   }
 
   public setHasMoreValues(moreValues?: boolean): Metavalues {
-    this.hasMoreValues = moreValues ?? true
+    const value = moreValues ?? true
+    this.hasMoreValues = value
+    return this
+  }
+
+  public setTotalValueCount(count?: number): Metavalues {
+    this.totalValueCount = count
     return this
   }
 
   public add(value: Metavalue | Metavalue[]): Metavalues {
     Array.isArray(value) ? this.values.push(...value) : this.values.push(value)
     return this
+  }
+
+  public withAttribute(name: string, value: object): Metavalues {
+    const attr = this.attributes.find(a => a.name === name)
+    if (attr)
+        attr.value = value as object
+    else
+        this.attributes.push(new Attribute(name, value))
+    return this
+  }
+
+  public hasAttribute(name: string): boolean {
+    return this.attributes.some(a => a.name === name)
+  }
+
+  public getAttribute<T>(name: string): T {
+    const item = this.attributes.find(item => item.name === name)
+    return item?.value as T
   }
 }
 
