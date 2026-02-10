@@ -5,7 +5,8 @@
       "WebFetch(domain:docs.npmjs.com)",
       "Bash(cat:*)",
       "Bash(npm install:*)",
-      "Bash(npx vitest run)"
+      "Bash(npx vitest run)",
+      "Bash(npx vitest run:*)"
     ]
   }
 }
