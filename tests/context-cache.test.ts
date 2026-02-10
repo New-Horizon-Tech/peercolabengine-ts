@@ -1,5 +1,15 @@
 import { describe, it, expect, vi } from 'vitest'
-import { InMemoryContextCache, CallInformation } from '../src/index.js'
+import { InMemoryContextCache, CallInformation, ContextCache } from '../src/index.js'
+
+class FailingContextCache implements ContextCache {
+  async put(): Promise<boolean> { return false }
+  async get(): Promise<CallInformation | null> { return null }
+}
+
+class ThrowingContextCache implements ContextCache {
+  async put(): Promise<boolean> { throw new Error('Cache connection failed') }
+  async get(): Promise<CallInformation | null> { throw new Error('Cache connection failed') }
+}
 
 describe('InMemoryContextCache', () => {
   it('put and get basic flow', async () => {
@@ -53,5 +63,31 @@ describe('InMemoryContextCache', () => {
     // Wait for expiration
     await new Promise(r => setTimeout(r, 60))
     expect(await cache.get('tx-expire')).toBeNull()
+  })
+})
+
+describe('FailingContextCache', () => {
+  it('put returns false', async () => {
+    const cache = new FailingContextCache()
+    const result = await cache.put('tx-1', CallInformation.new('en-GB'))
+    expect(result).toBe(false)
+  })
+
+  it('get returns null', async () => {
+    const cache = new FailingContextCache()
+    const result = await cache.get('tx-1')
+    expect(result).toBeNull()
+  })
+})
+
+describe('ThrowingContextCache', () => {
+  it('put throws', async () => {
+    const cache = new ThrowingContextCache()
+    await expect(cache.put('tx-1', CallInformation.new('en-GB'))).rejects.toThrow('Cache connection failed')
+  })
+
+  it('get throws', async () => {
+    const cache = new ThrowingContextCache()
+    await expect(cache.get('tx-1')).rejects.toThrow('Cache connection failed')
   })
 })

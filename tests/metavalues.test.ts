@@ -177,3 +177,51 @@ describe('Identifier', () => {
     expect(id.type).toBeUndefined()
   })
 })
+
+describe('CharacterMetaValues fluent chaining', () => {
+  it('builds complete character set via chaining', () => {
+    const now = new Date()
+    const cmv = CharacterMetaValues.fromSubject(new Identifier('s1', 'user'))
+      .withResponsible(new Identifier('r1', 'admin'))
+      .withPerformer(new Identifier('p1', 'system'))
+      .withTimestamp(now)
+
+    expect(cmv.hasSubject()).toBe(true)
+    expect(cmv.hasResponsible()).toBe(true)
+    expect(cmv.hasPerformer()).toBe(true)
+    expect(cmv.hasTimestamp()).toBe(true)
+    expect(cmv.subject!.type).toBe('user')
+    expect(cmv.responsible!.type).toBe('admin')
+    expect(cmv.performer!.type).toBe('system')
+    expect(cmv.timestamp).toBe(now)
+  })
+
+  it('withSubject on instance sets subject', () => {
+    const cmv = new CharacterMetaValues()
+      .withSubject(new Identifier('x', 'user'))
+
+    expect(cmv.subject!.type).toBe('user')
+    expect(cmv.subject!.id).toBe('x')
+  })
+
+  it('withResponsible on instance sets responsible', () => {
+    const cmv = new CharacterMetaValues()
+      .withResponsible(new Identifier('x', 'admin'))
+
+    expect(cmv.responsible!.type).toBe('admin')
+  })
+
+  it('withPerformer on instance sets performer', () => {
+    const cmv = new CharacterMetaValues()
+      .withPerformer(new Identifier('x', 'sys'))
+
+    expect(cmv.performer!.type).toBe('sys')
+  })
+
+  it('null/undefined timestamp', () => {
+    const cmv = new CharacterMetaValues().withTimestamp(undefined)
+
+    expect(cmv.hasTimestamp()).toBe(false)
+    expect(cmv.timestamp).toBeUndefined()
+  })
+})
