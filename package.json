@@ -22,7 +22,7 @@
   "type": "module",
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts --sourcemap --clean --out-dir dist",
-    "test": "node -e \"process.exit(0)\"",
+    "test": "vitest run",
     "postbuild": "node scripts/rename-mjs.cjs"
   },
   "publishConfig": {
@@ -38,7 +38,8 @@
   "devDependencies": {
     "@types/node": "^24.5.2",
     "tsup": "^8.5.0",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^4.0.18"
   },
   "types": "./dist/index.d.ts",
   "typesVersions": {

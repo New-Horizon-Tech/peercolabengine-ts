@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:remarkablemark.org)",
-      "WebFetch(domain:docs.npmjs.com)"
+      "WebFetch(domain:docs.npmjs.com)",
+      "Bash(cat:*)",
+      "Bash(npm install:*)",
+      "Bash(npx vitest run)"
     ]
   }
 }
