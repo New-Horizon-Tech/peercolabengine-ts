@@ -664,6 +664,7 @@ export class Result<T = undefined> {
                     if (v.initialCharacters?.performer) c.withPerformer(new Identifier(v.initialCharacters.performer.id, v.initialCharacters.performer.type))
                     if (v.initialCharacters?.responsible) c.withResponsible(new Identifier(v.initialCharacters.responsible.id, v.initialCharacters.responsible.type))
                     if (v.initialCharacters?.subject) c.withSubject(new Identifier(v.initialCharacters.subject.id, v.initialCharacters.subject.type))
+                    if (v.initialCharacters?.timestamp) c.withTimestamp(new Date(v.initialCharacters.timestamp))
                     mv.withInitialCharacters(c)
                 }
                 if (v.currentCharacters) {
@@ -671,6 +672,7 @@ export class Result<T = undefined> {
                     if (v.currentCharacters?.performer) c.withPerformer(new Identifier(v.currentCharacters.performer.id, v.currentCharacters.performer.type))
                     if (v.currentCharacters?.responsible) c.withResponsible(new Identifier(v.currentCharacters.responsible.id, v.currentCharacters.responsible.type))
                     if (v.currentCharacters?.subject) c.withSubject(new Identifier(v.currentCharacters.subject.id, v.currentCharacters.subject.type))
+                    if (v.currentCharacters?.timestamp) c.withTimestamp(new Date(v.currentCharacters.timestamp))
                     mv.withCurrentCharacters(c)
                 } 
                 if (v.attributes) {

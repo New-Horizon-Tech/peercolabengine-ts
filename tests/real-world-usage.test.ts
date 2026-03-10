@@ -745,13 +745,16 @@ describe('Result.serialize() / deserializeResult() full round-trip', () => {
 
     const rmv1 = restored.meta.getMetaValue('pet-1')!
     expect(rmv1.initialCharacters?.performer?.id).toBe('user-1')
+    expect(rmv1.initialCharacters?.timestamp).toEqual(new Date(2024, 0, 15))
     expect(rmv1.currentCharacters?.performer?.id).toBe('admin-1')
+    expect(rmv1.currentCharacters?.timestamp).toEqual(new Date(2024, 6, 20))
     expect(rmv1.getAttribute('createdSource')).toBe('mobile')
 
     const rmv2 = restored.meta.getMetaValue('pet-2')!
     expect(rmv2.initialCharacters?.performer?.id).toBe('user-2')
     expect(rmv2.initialCharacters?.responsible?.id).toBe('org-1')
     expect(rmv2.initialCharacters?.subject?.id).toBe('pet-2')
+    expect(rmv2.initialCharacters?.timestamp).toEqual(new Date(2024, 3, 10))
   })
 
   it('failed Result with nested error chain round-trips', () => {
