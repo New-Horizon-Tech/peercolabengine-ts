@@ -6,6 +6,7 @@ import {
   RequestOperation, MessageOperation, RequestOperationRequest, MessageOperationRequest,
   OutboundSessionBuilder, OutboundClientFactory, OutOfContextOperation,
   TransportOperationSettings, TransportSessionBuilder, TransportOperation,
+  ProcessChatInstruction, ProcessChatInstructionInput, ProcessChatInstructionOutput, ChatInstruction,
 } from '../src/index.js'
 
 const jsonSerializer: TransportSerializer = {
@@ -75,22 +76,6 @@ interface SyncOutput {
   syncToken: string
 }
 
-interface ChatInstructionInput {
-  usageInstructions: string
-  currentStateSnapshot: string
-  items: ChatMessageDto[]
-}
-
-interface ChatMessageDto {
-  type: string
-  role: string
-  content: string
-}
-
-interface ChatInstructionOutput {
-  message: string
-  operations: OutOfContextOperation[]
-}
 
 // --- Operations ---
 
@@ -139,11 +124,6 @@ class SyncTasks extends RequestOperation<SyncInput, SyncOutput> {
   }
 }
 
-class ProcessChat extends RequestOperation<ChatInstructionInput, ChatInstructionOutput> {
-  constructor() {
-    super('PeerColab.Instructions.ProcessChatInstruction', 'PROCESS')
-  }
-}
 
 // --- Helper ---
 
@@ -176,7 +156,7 @@ describe('Client-Server Serialization', () => {
   const updateProduct = new UpdateProduct()
   const getProductDetails = new GetProductDetails()
   const syncTasks = new SyncTasks()
-  const processChat = new ProcessChat()
+  const processChat = new ProcessChatInstruction()
 
   it('simple request serializes and deserializes correctly', async () => {
     const { clientSession } = buildClientServerPair(server => {
@@ -1048,11 +1028,11 @@ describe('Client-Server Serialization', () => {
   it('chat instruction complex nested with operations', async () => {
     const { clientSession } = buildClientServerPair(server => {
       server.intercept(processChat.handle(async (input) => {
-        const chatInput = input as ChatInstructionInput
+        const chatInput = input as ProcessChatInstructionInput
         expect(chatInput.items).toHaveLength(2)
         expect(chatInput.items[0]!.role).toBe('system')
 
-        return Result.ok<ChatInstructionOutput>({
+        return Result.ok<ProcessChatInstructionOutput>({
           message: 'I found some tasks to create',
           operations: [
             {

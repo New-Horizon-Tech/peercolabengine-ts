@@ -1717,3 +1717,46 @@ export abstract class MessageOperation<T> extends TransportOperation<T, undefine
 		return this.createHandler(this, interceptor)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Chat Instructions (built-in AI/LLM integration)
+// ---------------------------------------------------------------------------
+
+export type ChatInstruction = {
+  type: string
+  role: string
+  content: string
+}
+
+export type ProcessChatInstructionInput = {
+  usageInstructions: string
+  currentStateSnapshot: string
+  items: ChatInstruction[]
+}
+
+export type ProcessChatInstructionOutput = {
+  message?: string
+  operations: OutOfContextOperation[]
+}
+
+export class ProcessChatInstruction extends RequestOperation<ProcessChatInstructionInput, ProcessChatInstructionOutput> {
+  constructor() {
+    super(
+      'PeerColab.Instructions.ProcessChatInstruction',
+      'PROCESS',
+      [],
+      { requiresTenant: true, characterSetup: {} }
+    )
+  }
+}
+
+export class PeerColabAI {
+  public static processChatInstructions(input: ProcessChatInstructionInput): RequestOperationRequest<ProcessChatInstructionInput, ProcessChatInstructionOutput> {
+    const operation = new ProcessChatInstruction()
+    return new RequestOperationRequest<ProcessChatInstructionInput, ProcessChatInstructionOutput>(
+      'PeerColab.Instructions',
+      operation,
+      input
+    )
+  }
+}
