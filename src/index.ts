@@ -49,6 +49,15 @@ export type OutOfContextOperation = {
     pathParameters?: OutOfContextOperationPathParameter[];
 };
 
+export type OutOfContextEvent = {
+    usageId: string;
+    eventId: string;
+    eventType: string;
+    requestJson: any;
+    pathParameters?: OutOfContextOperationPathParameter[];
+    correlationId?: string;
+};
+
 export interface ContextCache {
     put(transactionId: UUID, ctx: CallInformation): Promise<boolean>
     get(transactionId: UUID): Promise<CallInformation | null>
@@ -130,6 +139,16 @@ export class TransportSessionBuilder {
         return this
     }
 
+    public subscribe<T>(handler: EventOperationHandler<T>): TransportSessionBuilder {
+        this.config.interceptors.addEventHandler(handler.operation.id, handler.handler as EventInterceptor<object>)
+        return this
+    }
+
+    public subscribePattern(pattern: string, handler: EventInterceptor<object>): TransportSessionBuilder {
+        this.config.interceptors.addEventPatternHandler(pattern, handler)
+        return this
+    }
+
     public inspectRequest(inspector: RequestInspector): TransportSessionBuilder {
         this.config.interceptors.requestsInspector = inspector
         return this
@@ -179,6 +198,16 @@ export class OutboundSessionBuilder {
 
     public interceptPattern(pattern: string, handler: RequestInterceptor<object,object>): OutboundSessionBuilder {
         this.config.interceptors.addPatternHandler(pattern, handler)
+        return this
+    }
+
+    public subscribe<T>(handler: EventOperationHandler<T>): OutboundSessionBuilder {
+        this.config.interceptors.addEventHandler(handler.operation.id, handler.handler as EventInterceptor<object>)
+        return this
+    }
+
+    public subscribePattern(pattern: string, handler: EventInterceptor<object>): OutboundSessionBuilder {
+        this.config.interceptors.addEventPatternHandler(pattern, handler)
         return this
     }
 
@@ -245,7 +274,7 @@ export class TransportSession {
             if (ctx.getAttribute(attribute.name))
                 return
             ctx.call.attributes.push(attribute)
-        }) 
+        })
         if (ctx.operation.type === "request") {
             const result = await this.config.interceptors.handleAsRequest(tr.requestJson as object, ctx) as Result<object>
             return result.assignSerializer(this.config.serializer)
@@ -253,7 +282,50 @@ export class TransportSession {
             const result = await this.config.interceptors.handleAsMessage(tr.requestJson as object, ctx) as Result<object>
             return result.assignSerializer(this.config.serializer)
         }
-    } 
+    }
+
+    public async acceptIncomingEvent(json: string, customAttributes: Attribute[] = []): Promise<Result<object>> {
+        const te = TransportEvent.fromSerialized<object>(this.config.serializer, json)
+        const ctx = TransportContext.fromEvent(te)
+        customAttributes.forEach((attribute) => {
+            if (ctx.getAttribute(attribute.name))
+                return
+            ctx.call.attributes.push(attribute)
+        })
+        const result = await this.config.interceptors.handleAsEvent(te.requestJson as object, ctx)
+        return result.assignSerializer(this.config.serializer)
+    }
+
+    public async acceptEvent(event: OutOfContextEvent, customAttributes: Attribute[] = []): Promise<Result<object>> {
+        const callInfo = CallInformation.new(this.config.locale)
+        callInfo.correlationId = event.correlationId
+        const ctx = new TransportContext(
+            new OperationInformation(
+                event.eventId,
+                event.eventType,
+                "event",
+                "",
+                event.usageId
+            ),
+            callInfo,
+            this.config.serializer
+        )
+        const pathParams = event.pathParameters?.map(p => ({
+            name: p.name,
+            value: p.value as unknown as object
+        })) ?? []
+        pathParams.forEach(p => {
+            if (!ctx.hasPathParameter(p.name))
+                ctx.call.pathParams.push(p)
+        })
+        customAttributes.forEach((attribute) => {
+            if (ctx.getAttribute(attribute.name))
+                return
+            ctx.call.attributes.push(attribute)
+        })
+        const result = await this.config.interceptors.handleAsEvent(event.requestJson as object, ctx)
+        return result.assignSerializer(this.config.serializer)
+    }
 
     public createClient(clientIdentifier: string, dataTenant?: string): TransportClient {
         const info: CallInformation = CallInformation.new(
@@ -291,6 +363,13 @@ export class TransportClient {
         // Clone to avoid state sharing issues
         const newCallInfo = Object.assign({}, this.callInfo)
         newCallInfo.locale = locale
+        return new TransportClient(this.clientIdentifier, this.config, newCallInfo, this.matchSessions)
+    }
+
+    public withCorrelationId(correlationId: UUID): TransportClient {
+        // Clone to avoid state sharing issues
+        const newCallInfo = Object.assign({}, this.callInfo)
+        newCallInfo.correlationId = correlationId
         return new TransportClient(this.clientIdentifier, this.config, newCallInfo, this.matchSessions)
     }
 
@@ -362,6 +441,33 @@ export class TransportClient {
             return await this.config.interceptors.handleAsRequest(call.input as object, ctx, this.matchSessions) as Result<R>
         else
             return await this.config.interceptors.handleAsMessage(call.input as object, ctx, this.matchSessions) as Result<R>
+    }
+
+    public async dispatch<T>(call: EventDispatchRequest<T>, timeoutMs: number = 30_000): Promise<Result<object>> {
+        // Clone before sending to avoid state sharing issues
+        const requestCallInfo = Object.assign({}, this.callInfo)
+        requestCallInfo.transactionId = generateUUID()
+        const ctx = new TransportContext(
+            call.asOperationInformation(this.clientIdentifier),
+            requestCallInfo,
+            this.config.serializer
+        )
+        const work = this.config.interceptors.handleAsEvent(call.input as object, ctx, this.matchSessions)
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const timeout = new Promise<Result<object>>((resolve) => {
+            timer = setTimeout(() => {
+                resolve(Result.failed<object>(
+                    504,
+                    "TransportSession.DispatchTimeout",
+                    `Dispatch exceeded ${timeoutMs}ms`
+                ))
+            }, timeoutMs)
+        })
+        try {
+            return await Promise.race([work, timeout])
+        } finally {
+            if (timer) clearTimeout(timer)
+        }
     }
 
     public async acceptOperation(operation: OutOfContextOperation, customAttributes: Attribute[] = []): Promise<Result<object>> {
@@ -468,6 +574,7 @@ export class TransportRequest<T> {
             [],
             [],
             {} as unknown as T,
+            undefined,
             undefined
         )
             .assignSerializer(serializer)
@@ -478,7 +585,7 @@ export class TransportRequest<T> {
 
     constructor(
         public readonly operationId: string,
-        public readonly operationVerb:string, 
+        public readonly operationVerb:string,
         public readonly operationType:string,
         public readonly callingClient:string,
         public readonly usageId:string,
@@ -490,7 +597,8 @@ export class TransportRequest<T> {
         public readonly attributes: Attribute[],
         public readonly pathParams: Attribute[],
         public readonly requestJson: T,
-        public raw?: string | null
+        public raw?: string | null,
+        public readonly correlationId?: UUID
     ) {
     }
 
@@ -509,7 +617,9 @@ export class TransportRequest<T> {
             ctx.call.characters,
             ctx.call.attributes,
             ctx.call.pathParams,
-            input
+            input,
+            undefined,
+            ctx.call.correlationId
         ).assignSerializer(ctx.serializer)
     }
 
@@ -541,7 +651,107 @@ export class TransportRequest<T> {
             deserialized.attributes,
             deserialized.pathParams,
             deserialized.requestJson,
-            serialized
+            serialized,
+            deserialized.correlationId
+        )
+        newFromDeserialized.assignSerializer(this.serializer)
+        return newFromDeserialized
+    }
+}
+
+export class TransportEvent<T> {
+    static fromSerialized<T>(serializer: TransportSerializer, serialized: string): TransportEvent<T> {
+        return new TransportEvent<T>(
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            {
+                performer: undefined,
+                responsible: undefined,
+                subject: undefined,
+            },
+            [],
+            [],
+            {} as unknown as T,
+            undefined,
+            undefined
+        )
+            .assignSerializer(serializer)
+            .deserialize(serialized)
+    }
+
+    public serializer?: TransportSerializer
+
+    constructor(
+        public readonly eventId: string,
+        public readonly eventType: string,
+        public readonly callingClient: string,
+        public readonly usageId: string,
+
+        public readonly transactionId: UUID,
+        public readonly dataTenant: string,
+        public readonly locale: string,
+        public readonly characters: ICharacters,
+        public readonly attributes: Attribute[],
+        public readonly pathParams: Attribute[],
+        public readonly requestJson: T,
+        public raw?: string | null,
+        public readonly correlationId?: UUID
+    ) {
+    }
+
+    public static from<T>(input: T, ctx: TransportContext): TransportEvent<T> {
+        return new TransportEvent<T>(
+            ctx.operation.id,
+            ctx.operation.verb,
+            ctx.operation.callingClient,
+            ctx.operation.usageId,
+
+            ctx.call.transactionId ? ctx.call.transactionId : generateUUID(),
+            ctx.call.dataTenant || '',
+            ctx.call.locale,
+            ctx.call.characters,
+            ctx.call.attributes,
+            ctx.call.pathParams,
+            input,
+            undefined,
+            ctx.call.correlationId
+        ).assignSerializer(ctx.serializer)
+    }
+
+    public assignSerializer(serializer: TransportSerializer): TransportEvent<T> {
+        this.serializer = serializer
+        return this
+    }
+
+    public serialize(): string {
+        if (!this.serializer)
+            throw new Error('No serializer assigned to TransportEvent')
+        return this.serializer.serialize(this)
+    }
+
+    public deserialize<T>(serialized: string): TransportEvent<T> {
+        if (!this.serializer)
+            throw new Error('No serializer assigned to TransportEvent')
+        const deserialized = this.serializer.deserialize<TransportEvent<T>>(serialized)
+        const newFromDeserialized = new TransportEvent<T>(
+            deserialized.eventId,
+            deserialized.eventType,
+            deserialized.callingClient,
+            deserialized.usageId,
+            deserialized.transactionId,
+            deserialized.dataTenant,
+            deserialized.locale,
+            deserialized.characters,
+            deserialized.attributes,
+            deserialized.pathParams,
+            deserialized.requestJson,
+            serialized,
+            deserialized.correlationId
         )
         newFromDeserialized.assignSerializer(this.serializer)
         return newFromDeserialized
@@ -578,9 +788,10 @@ export class CallInformation {
 
         public attributes: Attribute[],
         public pathParams: Attribute[],
-        public transactionId: UUID
+        public transactionId: UUID,
+        public correlationId?: UUID
     ) { }
-    
+
 }
 
 export class TransportContext {
@@ -625,7 +836,8 @@ export class TransportContext {
                 gatewayRequest.characters,
                 gatewayRequest.attributes,
                 gatewayRequest.pathParams,
-                gatewayRequest.transactionId
+                gatewayRequest.transactionId,
+                gatewayRequest.correlationId
             ),
             gatewayRequest.serializer
         )
@@ -637,6 +849,34 @@ export class TransportContext {
 
     public serializeRequest<T>(input: T): string {
         return TransportRequest.from(input, this).serialize()
+    }
+
+    public serializeEvent<T>(input: T): string {
+        return TransportEvent.from(input, this).serialize()
+    }
+
+    public static fromEvent(transportEvent: TransportEvent<object>): TransportContext {
+        if (!transportEvent.serializer)
+            throw new Error('Serializer required to convert from transport event')
+        return new TransportContext(
+            new OperationInformation(
+                transportEvent.eventId,
+                transportEvent.eventType,
+                "event",
+                transportEvent.callingClient,
+                transportEvent.usageId
+            ),
+            new CallInformation(
+                transportEvent.locale,
+                transportEvent.dataTenant,
+                transportEvent.characters,
+                transportEvent.attributes,
+                transportEvent.pathParams,
+                transportEvent.transactionId,
+                transportEvent.correlationId
+            ),
+            transportEvent.serializer
+        )
     }
 }
 
@@ -1306,13 +1546,17 @@ export interface TransportSessionConfiguration {
 export class TransportDispatcher {
     private sortPatterns: boolean
     private sortedPatterns: string[] = []
+    private sortEventPatterns: boolean = false
+    private sortedEventPatterns: string[] = []
 
     public requestsInspector: RequestInspector | null = null
-    public responsesInspector: ResponseInspector | null = null 
+    public responsesInspector: ResponseInspector | null = null
 
     private requestHandlers: Map<string,RequestInterceptor<object,object>> = new Map<string,RequestInterceptor<object,object>>()
     private messageHandlers: Map<string,MessageInterceptor<object>> = new Map<string,MessageInterceptor<object>>()
     private patternHandlers: Map<string,RequestInterceptor<object,object>> = new Map<string,RequestInterceptor<object,object>>()
+    private eventHandlers: Map<string,EventInterceptor<object>[]> = new Map<string,EventInterceptor<object>[]>()
+    private eventPatternHandlers: Map<string,EventInterceptor<object>[]> = new Map<string,EventInterceptor<object>[]>()
 
     constructor(
         public sessionIdentifier: string,
@@ -1336,6 +1580,24 @@ export class TransportDispatcher {
         this.validateUniqueHandler(pattern)
         this.patternHandlers.set(pattern, handler)
         this.sortPatterns = true
+    }
+
+    public addEventHandler(eventId: string, handler: EventInterceptor<object>): void {
+        const existing = this.eventHandlers.get(eventId)
+        if (existing)
+            existing.push(handler)
+        else
+            this.eventHandlers.set(eventId, [handler])
+    }
+
+    public addEventPatternHandler(pattern: string, handler: EventInterceptor<object>): void {
+        const existing = this.eventPatternHandlers.get(pattern)
+        if (existing) {
+            existing.push(handler)
+        } else {
+            this.eventPatternHandlers.set(pattern, [handler])
+            this.sortEventPatterns = true
+        }
     }
 
     public async routeFromGatewayRequest(input: object, ctx: TransportContext): Promise<Result<object>> {
@@ -1369,6 +1631,82 @@ export class TransportDispatcher {
         if (handler)
             return await this.runRequestHandler(handler, input, cacheResult.value)
         return await this.runPatternHandler(input, cacheResult.value)
+    }
+
+    public async handleAsEvent(input: object, ctx: TransportContext, matchSessions: boolean = false): Promise<Result<object>> {
+        const inspectionResult = await this.inspectRequest(input, ctx)
+        const cacheResult = await this.handleCache(ctx, matchSessions)
+        if (!cacheResult.success)
+            return cacheResult.asGeneric()
+        if (inspectionResult)
+            return inspectionResult
+
+        const eventId = cacheResult.value.operation.id
+        const specific = this.eventHandlers.get(eventId) ?? []
+        const matchingPattern = this.findMatchingEventPattern(eventId)
+        const patternHandlers = matchingPattern ? (this.eventPatternHandlers.get(matchingPattern) ?? []) : []
+
+        const all: { id: string, handler: EventInterceptor<object> }[] = [
+            ...specific.map((h, idx) => ({ id: specific.length > 1 ? `${eventId}#${idx}` : eventId, handler: h })),
+            ...patternHandlers.map((h, idx) => ({ id: patternHandlers.length > 1 ? `${matchingPattern}#${idx}` : (matchingPattern as string), handler: h }))
+        ]
+
+        if (all.length === 0) {
+            return await this.inspectResponse(this.handlerNotFound(eventId).asGeneric(), input, cacheResult.value)
+        }
+
+        const outcomes = await Promise.all(all.map(async ({ id, handler }) => {
+            try {
+                const r = await handler(input, cacheResult.value)
+                return { id, result: r }
+            } catch (e) {
+                return { id, result: this.genericError(e) }
+            }
+        }))
+
+        const failed: TransportError[] = []
+        for (const { id, result } of outcomes) {
+            if (!result.success) {
+                const err = result.error ?? new TransportError(
+                    "TransportSession.DispatchHandlerFailed",
+                    { technicalError: "Handler returned failed result without error" }
+                )
+                failed.push(new TransportError(
+                    err.code,
+                    { ...err.details, calledOperation: id },
+                    err.related,
+                    err.parent
+                ))
+            }
+        }
+
+        const aggregated: Result<object> = failed.length === 0
+            ? Result.ok().asGeneric()
+            : Result.failed<object>(
+                500,
+                new TransportError(
+                    "TransportSession.DispatchPartialFailure",
+                    { technicalError: `${failed.length} of ${all.length} subscriber(s) failed` },
+                    failed,
+                    undefined
+                )
+            )
+
+        return await this.inspectResponse(aggregated, input, cacheResult.value)
+    }
+
+    private findMatchingEventPattern(eventId: string): string | null {
+        if (this.sortEventPatterns) {
+            const keys = Array.from(this.eventPatternHandlers.keys())
+            keys.sort((a, b) => a.toLowerCase().length > b.toLowerCase().length ? -1 : 1)
+            this.sortedEventPatterns = keys
+            this.sortEventPatterns = false
+        }
+        for (const key of this.sortedEventPatterns) {
+            if (eventId.startsWith(key))
+                return key
+        }
+        return null
     }
 
     private validateUniqueHandler(id: string) {
@@ -1670,6 +2008,15 @@ export class MessageOperationHandler<T> extends OperationHandler<T, undefined> {
     }
 }
 
+export class EventOperationHandler<T> extends OperationHandler<T, undefined> {
+    constructor(
+        operation: DispatchOperation<T>,
+        public handler: (input: T, ctx: TransportContext) => Promise<Result>
+    ) {
+        super(operation)
+    }
+}
+
 export abstract class OperationRequest<T,R> {
     public constructor(
         public usageId: string,
@@ -1689,6 +2036,7 @@ export abstract class OperationRequest<T,R> {
 
 export class RequestOperationRequest<T,R> extends OperationRequest<T,R> { }
 export class MessageOperationRequest<T> extends OperationRequest<T,undefined> { }
+export class EventDispatchRequest<T> extends OperationRequest<T,undefined> { }
 
 export abstract class RequestOperation<T, R> extends TransportOperation<T, R> { 
     constructor(id: string, verb: string, pathParameters?: string[], settings?: TransportOperationSettings) {
@@ -1704,7 +2052,7 @@ export abstract class RequestOperation<T, R> extends TransportOperation<T, R> {
 	}
 }
 
-export abstract class MessageOperation<T> extends TransportOperation<T, undefined> { 
+export abstract class MessageOperation<T> extends TransportOperation<T, undefined> {
     constructor(id: string, verb: string, pathParameters?: string[], settings?: TransportOperationSettings) {
         super("message", id, verb, pathParameters, settings)
     }
@@ -1716,6 +2064,22 @@ export abstract class MessageOperation<T> extends TransportOperation<T, undefine
     public handle(interceptor: MessageInterceptor<T>): MessageOperationHandler<T> {
 		return this.createHandler(this, interceptor)
 	}
+}
+
+export type EventInterceptor<T> = (input: T, ctx: TransportContext) => Promise<Result>
+
+export abstract class DispatchOperation<T> extends TransportOperation<T, undefined> {
+    constructor(id: string, eventType: string, pathParameters?: string[], settings?: TransportOperationSettings) {
+        super("event", id, eventType, pathParameters, settings)
+    }
+
+    protected createHandler<T>(instance: DispatchOperation<T>, interceptor: EventInterceptor<T>): EventOperationHandler<T> {
+        return new EventOperationHandler<T>(instance, interceptor)
+    }
+
+    public handle(interceptor: EventInterceptor<T>): EventOperationHandler<T> {
+        return this.createHandler(this, interceptor)
+    }
 }
 
 // ---------------------------------------------------------------------------
